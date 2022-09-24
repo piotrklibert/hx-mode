@@ -1,4 +1,5 @@
 ;; -*- mode: emacs-lisp; lexical-binding: t -*-
+(require 'my-utils)
 
 (require 'promise)
 (require 'short-lambda)
@@ -6,8 +7,6 @@
 (require 'hx-cli)
 (require 'hx-legacy)
 
-
-;; (locate-file "haxe-mode" load-path (get-load-suffixes))
 
 (defconst hx--service-available-types
   '("toplevel" ;; also the default
@@ -19,7 +18,17 @@
   (hx-query-command
    "~/portless/lua/awesome-config/haxeshigh/src/volume/Volume.hx"
    "type"
-   "626"))
+   "629"))
+
+;; (promise-then (hx--query-async hx--client-command-example) (k-part (message "+++ %s")))
+
+
+;; TODO:
+;; (defvar hx-slot-freed-hook nil)
+;; (add-hook 'hx-slot-freed-hook (lambda ()))
+;;
+;; (cl-defstruct hx-interactions-pool
+;;   interactions pool-size)
 
 
 (cl-defstruct hx-interaction
@@ -27,18 +36,21 @@
 other metadata. `promise' is meant to be mutable and is updated during every
 `promise-then' call; the rest of the fields should only be set once (however,
 this is not enforced currently)."
-  promise process buffer cmd)
+  promise process buffer cmd output state)
 
 
 (cl-defmethod promise-then ((this hx-interaction) &optional resolve reject)
-  (setf (hx-interaction-promise this) (promise-then
-                                          (hx-interaction-promise this)
-                                        resolve reject))
+  (setf (hx-interaction-promise this)
+        (promise-then
+            (hx-interaction-promise this)
+          resolve reject))
   this)
 
 
-(cl-defun hx-kill-interaction (obj)
-  (kill-process (hx-interaction-process obj)))
+(cl-defun hx-interaction:interrupt (obj)
+  (cl-letf* ((inhibit-message t))
+    (with-demoted-errors "hx-kill-interaction: %s"
+     (kill-process (hx-interaction-process obj)))))
 
 
 (put 'hx-query 'lisp-indent-function 1)
@@ -49,7 +61,10 @@ this is not enforced currently)."
   "Main function of this module, sends a query about the position at point to
 the compiler service and returns either the result directly, or a promise that
 will resolve once the started process finishes successfully. If the process
-return an error, the promise will be rejected."
+return an error, the promise will be rejected.
+
+This is interactive command and should not be used from Lisp. Use
+`hx--query-sync' or `hx--query-async' directly."
   (interactive "sType: ")
   (let* ((path (buffer-file-name (current-buffer)))
          (cmd (hx-query-command path type)))
@@ -60,53 +75,83 @@ return an error, the promise will be rejected."
 
 
 (cl-defun hx--query-sync (cmd)
+  "CMD is a list of strings."
   (cl-letf* ((default-directory hx--project-shadow))
     (shell-command-to-string (s-join " " cmd))))
 
-
 (cl-defun hx--query-async (cmd &optional callback errback)
+  "CMD is a list of strings. CALLBACK and ERRBACK are functions."
   (let ((callback (if (functionp callback) callback #'identity))
         (errback (if (functionp errback) errback #'identity)))
-    (promise-then (hx--make-client-interaction cmd)
+    (promise-then (hx--make-interaction-for-command cmd)
       callback errback)))
 
 
-(cl-defun hx--make-client-interaction (cmd)
-  (let* ((buf (generate-new-buffer "*haxe*"))
-         (cleanup (lambda (trans)
-                    (lambda (data)
-                      (kill-buffer buf)
-                      (funcall trans data)))))
-    (promise-then
-        (hx--make-client-process-with-buf buf cmd)
-      (funcall cleanup 'identity)
-      (funcall cleanup 'error))))
+
 
 
-(cl-defun hx--make-client-process-with-buf (buf cmd)
-  (let
-      ((interaction (make-hx-interaction)))
-    (setf (hx-interaction-promise interaction)
-          (promise-new
-           (lambda (resolve reject)
-             (cl-letf*
-                 ((default-directory hx--project-shadow)
-                  (name (buffer-name buf))
-                  (sentinel (hx--make-sentinel-function buf resolve reject))
-                  (proc (make-process :name name :buffer buf :command cmd
-                                      :sentinel sentinel)))
-               (setf (hx-interaction-process interaction) proc)
-               (setf (hx-interaction-buffer interaction) buf)))))
-    interaction))
+(cl-defun my-to-string (arg)
+  (format "%s" arg))
+
+(cl-defsubst hx--make-interaction-for-command (cmd)
+  (seq-let (promise process) (hx--make-promised-process cmd)
+    (let ((ia (make-hx-interaction :promise promise :process process)))
+      (setf (hx-interaction-promise ia)
+            (promise-then promise
+              (lambda (x)
+                ;; (cl-letf* ((inhibit-message t)) (message "c: %s" ?x))
+                (setf (hx-interaction-output ia) x)
+                (setf (hx-interaction-process ia) nil)
+                (setf (hx-interaction-buffer ia) nil)
+                (setf (hx-interaction-state ia) 'done)
+                (promise-resolve x)
+                )
+              (lambda (x)
+                ;; (cl-letf* ((inhibit-message t)) (message "e: %s" x))
+                (setf (hx-interaction-output ia) x)
+                (setf (hx-interaction-process ia) nil)
+                (setf (hx-interaction-buffer ia) nil)
+                (setf (hx-interaction-state ia) 'error)
+                (promise-reject x))))
+      ia)))
 
 
-(cl-defun hx--make-sentinel-function (buffer resolve reject)
+(cl-defun hx--make-promised-process (cmd &optional cwd)
+  (setq cmd (mapcar 'my-to-string cmd))
+  (let (process)
+    (list
+     (promise-new
+      (lambda (resolve reject)
+        (cl-letf*
+            ((default-directory (or cwd default-directory))
+             (buffer (generate-new-buffer
+                      (format "*%s*" (sha1 (s-join "" cmd)))))
+             (buf-name (buffer-name buffer))
+             (sentinel (hx--make-process-sentinel buffer resolve reject))
+             (proc (make-process :command cmd
+                                 :name buf-name
+                                 :buffer buffer
+                                 :stderr nil
+                                 :sentinel sentinel)))
+          (setf process proc))))
+     process)))
+
+
+(cl-defun hx--make-process-sentinel (buffer resolve reject)
   (lambda (process event)
-    (cl-assert (eq (process-buffer process) buffer))
-    (if (string= event "finished\n")
-        (with-current-buffer buffer
-          (funcall resolve (buffer-string)))
-      (funcall reject event))))
+    (unwind-protect
+        (if (string= event "finished\n")
+            (funcall resolve (hx--get-process-output process))
+          (funcall reject event))
+      (kill-buffer buffer))))
+
+
+(cl-defun hx--get-process-output (process)
+  (with-current-buffer (process-buffer process)
+    (buffer-substring-no-properties (point-min) (point-max))))
+
+
+
 
 
 (cl-defun hx-show-compiler-feedback-at-point ()
@@ -114,7 +159,7 @@ return an error, the promise will be rejected."
   (with-current-buffer (get-buffer "Volume.hx")
     (let ((resps (cl-loop
                   for type in '("position" "type" "module-symbols")
-                  collect (hx-query type #f(message "%s" %)))))
+                  collect (hx-query type (k-part (message "%s"))))))
       (promise-then (promise-all resps) #f(message "%s" %)))))
 
 

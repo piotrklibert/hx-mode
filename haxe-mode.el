@@ -1,9 +1,18 @@
 ;;; haxe-mode.el --- Major mode for editing Haxe files  -*- mode: emacs-lisp; lexical-binding: t -*-
 (require 'js)
 (require 'auto-complete)
-;; guide http://cc-mode.sourceforge.net/derived-mode-ex.el
+(require 'hx-eldoc)
+(require 'cc-mode)
+(require 'cc-fonts)
+(require 'cc-langs)
+(require 'cc-bytecomp)
+(require 'compile)
+(require 'groovy-mode)
+
 
 ;;; Usage:
+;;
+;; guide http://cc-mode.sourceforge.net/derived-mode-ex.el
 ;;
 ;; Include something like this in your .emacs:
 ;; (require 'haxe-mode)
@@ -26,13 +35,6 @@
 
 
 ;;; Code:
-
-(require 'cc-mode)
-(require 'cc-fonts)
-(require 'cc-langs)
-(require 'cc-bytecomp)
-(require 'compile)
-(require 'groovy-mode)
 
 
 ;; The language constants are needed when compiling.

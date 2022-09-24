@@ -26,9 +26,11 @@
   (when (s-starts-with-p hx--project-root path)
     (let ((shadow-path (hx--shadow-path path)))
       (when-let (path (mkdir (f-dirname shadow-path) t))
-        (message "HX: Created path `%s'" path))
+        (cl-letf* ((inhibit-message t))
+          (message "HX: Created path `%s'" path)))
       (f-write (buffer-string) 'utf-8 shadow-path)
-      (message "HX: Updated file `%s'" shadow-path))))
+      (cl-letf* ((inhibit-message t))
+        (message "HX: Updated file `%s'" shadow-path)))))
 
 
 (defsubst hx--relative-path (path)

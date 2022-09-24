@@ -19,7 +19,7 @@
         (apply #'hx--get-symbol-from-buffer-pos
                (->> pos                 ; pos is: '(fname lineno char-range)
                  (-update-at 1 'string-to-number)
-                 (-update-at 2 #f(hx--parse-position-range (cl-third %)))))))
+                 (-update-at 2 #f(hx--parse-position-range %))))))
     (format "%s: %s" symname (s-trim (nth 2 root)))))
 
 
@@ -44,23 +44,28 @@
 
 
 
+(defconst my-tmp nil)
+(defconst my-tmp-next 0)
+
+;; (hx--parse-eldoc my-tmp)
 
 (cl-defun hx-eldoc-function (callback)
   (interactive)
-  (when hx-eldoc--in-progress
-    (hx-kill-interaction hx-eldoc--in-progress))
   (let ((interaction (hx-query "type" t)))
     (setq hx-eldoc--in-progress interaction)
     (promise-then interaction
       (lambda (result)
-        (ignore-errors
-          (funcall callback (hx--parse-eldoc result)))
-      (lambda (_err)
+        (when (equal hx-eldoc--in-progress interaction)
+          (funcall callback (hx--parse-eldoc result))
+          (setq hx-eldoc--in-progress nil)))
+      (lambda (err)
         ;; happens when point is over keywords, imports, and other things; and
         ;; also when the process is killed
         (cl-letf* ((inhibit-message t))
           (message "%s" "error or abort"))
-        (funcall callback nil))))))
+        (when (equal hx-eldoc--in-progress interaction)
+          (setq hx-eldoc--in-progress nil))
+        (promise-reject err)))))
 
 
 (provide 'hx-eldoc)
