@@ -302,17 +302,10 @@ or, if they are nil, on the current buffer file and point."
 
 (defun battle-haxe-get-byte-pos (target-point)
   "Take the TARGET-POINT in the current buffer and return the byte position.
-Haxe compiler services damands only byte position so some quirks must be handled."
-  (let ((was-multibyte enable-multibyte-characters)
-        (bytepos 0))
-    (set-buffer-multibyte nil)
-    (setq bytepos
-          (-
-           (bufferpos-to-filepos target-point 'exact)
-           (if (battle-haxe-file-has-BOM)
-               2
-             0)))
-    (set-buffer-multibyte was-multibyte)
+Haxe compiler services demands only byte position so some quirks must be
+handled."
+  (let ((bytepos 0))
+    (setq bytepos (bufferpos-to-filepos target-point 'exact))
     bytepos))
 
 (defun battle-haxe-file-has-BOM ()

@@ -21,11 +21,12 @@
 (cl-defun hx--client-full-command (pos &optional cwd hxml)
   (list
    "/usr/local/bin/haxe"
-   "--connect" "9999"
+   ;; "-D" "display-details"
+   ;; "--connect" "9999"
    "--cwd" (or cwd hx--project-shadow)
    "--display" pos
    (or hxml hx--hxml-file)))
-;; (hx--client-full-command 123)
+;; (s-join "\n" (--map (format "%s" it) (hx--client-full-command 123)))
 
 
 (provide 'hx-cli)

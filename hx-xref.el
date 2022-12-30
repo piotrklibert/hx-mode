@@ -24,9 +24,8 @@
            collect (xref-make symbol (xref-make-file-location
                                       (car pos) (cdr pos) 0))))
 
-;; TODO: WTF is this?
 (cl-defmethod xref-backend-identifier-completion-table ((_backend (head my-haxe)))
-  (list 'fuck))
+  (list (symbol-name (symbol-at-point))))
 
 
 (cl-defun hx--format-position (data)

@@ -8,11 +8,11 @@
 ;; TODO:  TEMPORARY globals, until better project handling is in place
 
 (defconst hx--project-root
-  "/home/cji/portless/lua/awesome-config/haxeshigh/")
+  "/home/cji/priv/awesomescripts/haxeshigh/")
 (defconst hx--project-shadow
-  "/home/cji/portless/lua/awesome-config/haxeshigh/shadow/")
+  "/home/cji/priv/awesomescripts/haxeshigh/shadow/")
 (defconst hx--hxml-file
-  "/home/cji/portless/lua/awesome-config/haxeshigh/shadow/main.hxml")
+  "/home/cji/priv/awesomescripts/haxeshigh/shadow/main.hxml")
 
 
 ;; TODO: ./shadow -> ./.batllefield (maybe later)
@@ -23,14 +23,18 @@
 ;; (hx-shadow-update-files (buffer-file-name (get-buffer "Volume.hx")))
 (cl-defun hx-shadow-update-files (&optional (path (hx--exp-buf-name)))
   (interactive)
+
   (when (s-starts-with-p hx--project-root path)
-    (let ((shadow-path (hx--shadow-path path)))
+    (let ((shadow-path (hx--shadow-path path))
+          (buf (buffer-substring-no-properties (point-min) (point-max))))
       (when-let (path (mkdir (f-dirname shadow-path) t))
-        (cl-letf* ((inhibit-message t))
-          (message "HX: Created path `%s'" path)))
-      (f-write (buffer-string) 'utf-8 shadow-path)
-      (cl-letf* ((inhibit-message t))
-        (message "HX: Updated file `%s'" shadow-path)))))
+        path
+        ;; (cl-letf* ((inhibit-message t)) (message "HX: Created path `%s'" path))
+        )
+      (with-current-buffer (get-buffer-create "nvm")
+        (f-write buf 'utf-8 shadow-path))
+      ;; (cl-letf* ((inhibit-message t)) (message "HX: Updated file `%s'" shadow-path))
+      )))
 
 
 (defsubst hx--relative-path (path)
@@ -46,7 +50,7 @@
 (defsubst hx--unshadow-path (path)
   (if (s-starts-with-p hx--project-shadow path)
       (s-replace "shadow/" "" path)
-    path))
+    (s-replace "/usr/local/share/haxe/std" "/home/cji/portless/versions/haxe/haxe/std" path)))
 
 
 

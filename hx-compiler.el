@@ -8,10 +8,22 @@
 (require 'hx-legacy)
 
 
+;; NOTE: go to ~/portless/lua/awesome-config/haxeshigh/shadow/ and start display
+;; server manually for now:
+;; haxe --wait 9999 -v -D log ./main.hxml
+
+
+
 (defconst hx--service-available-types
-  '("toplevel" ;; also the default
-    "position" "usage" "package" "type" "module-symbols" "signature"
-    "diagnostics" "statistics"))
+  '("toplevel" ; also the default
+    "position" ; go to definition
+    "usage"    ; see references
+    "type"     ; type at point-min
+    "package"
+    "module-symbols"
+    "signature"
+    "diagnostics"
+    "statistics"))
 
 
 (defconst hx--client-command-example   ; temporary, replace with proper tests
@@ -93,7 +105,7 @@ This is interactive command and should not be used from Lisp. Use
 (cl-defun my-to-string (arg)
   (format "%s" arg))
 
-(cl-defsubst hx--make-interaction-for-command (cmd)
+(cl-defun hx--make-interaction-for-command (cmd)
   (seq-let (promise process) (hx--make-promised-process cmd)
     (let ((ia (make-hx-interaction :promise promise :process process)))
       (setf (hx-interaction-promise ia)
@@ -131,7 +143,7 @@ This is interactive command and should not be used from Lisp. Use
              (proc (make-process :command cmd
                                  :name buf-name
                                  :buffer buffer
-                                 :stderr nil
+                                 :stderr nil ; "*err*"
                                  :sentinel sentinel)))
           (setf process proc))))
      process)))
@@ -154,18 +166,25 @@ This is interactive command and should not be used from Lisp. Use
 
 
 
-(cl-defun hx-show-compiler-feedback-at-point ()
-  (interactive)
-  (with-current-buffer (get-buffer "Volume.hx")
+(cl-defun hx-show-compiler-feedback-at-point (buf)
+  (interactive (list (current-buffer)))
+  (with-current-buffer buf
     (let ((resps (cl-loop
-                  for type in '("position" "type" "module-symbols")
+                  for type in '("toplevel" "position" "type" "usage")
                   collect (hx-query type (k-part (message "%s"))))))
       (promise-then (promise-all resps) #f(message "%s" %)))))
 
+(cl-defun hx--query-toplevel ()
+  (interactive)
+  (promise-then (hx-query "toplevel" t)
+    #f(message "%s" %)))
 
 (with-eval-after-load "haxe-mode"
   (defvar haxe-mode-map)
-  (define-key haxe-mode-map (kbd "<f12>") 'hx-show-compiler-feedback-at-point))
+  (define-key haxe-mode-map (kbd "<f12>") 'hx-show-compiler-feedback-at-point)
+  (define-key haxe-mode-map (kbd "<f11>") 'hx--query-toplevel)
+  (define-key haxe-mode-map (kbd "<menu>") 'hx-get-completions)
+  )
 
 
 (provide 'hx-compiler)

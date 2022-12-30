@@ -1,18 +1,10 @@
 ;; -*- mode: emacs-lisp; lexical-binding: t -*-
-
-
 (require 'hx-compiler)
 
-
-
-
-add-interaction
-
-run-hook-with-args
-
-cache positions -> check if range left
-
-detecting changes in buffer
+;; add-interaction
+;; run-hook-with-args
+;; cache positions -> check if range left
+;; detecting changes in buffer
 
 ;; (locate-file "haxe-mode" load-path (get-load-suffixes))
 (defconst my-tmp

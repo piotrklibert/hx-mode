@@ -6,40 +6,52 @@
 
 (cl-defun hx--parse-eldoc (res)
   (cond
-   ((s-contains-p "<metadata>" res) (s-replace-regexp "</?metadata>" "" res))
+   ((s-contains-p "<metadata>" res)
+    (s-replace-regexp "</?metadata>" "" res))
    (t
     (hx-eldoc--parse-type res))))
 
 
 (cl-defun hx-eldoc--parse-type (res)
-  (let*
-      ((root (-> res battle-haxe-get-xml-root car))
-       (pos (s-split ":" (xml-get-attribute root 'p)))
-       (symname
-        (apply #'hx--get-symbol-from-buffer-pos
-               (->> pos                 ; pos is: '(fname lineno char-range)
-                 (-update-at 1 'string-to-number)
-                 (-update-at 2 #f(hx--parse-position-range %))))))
-    (format "%s: %s" symname (s-trim (nth 2 root)))))
-
+  (condition-case err
+      (let*
+          ((root (-> res battle-haxe-get-xml-root car))
+           (pos (s-split ":" (xml-get-attribute root 'p)))
+           (posfmt (->> pos             ; pos is: '(fname lineno char-range)
+                     (-update-at 1 #'string-to-number)
+                     (-update-at 2 #f(hx--parse-position-range %))))
+           (symname
+            (apply #'hx--get-symbol-from-buffer-pos posfmt)))
+        (format "%s: %s" symname (s-trim (nth 2 root))))
+    (error nil ;(message "%s" err)
+           )))
 
 ;; (hx--parse-position-range "2-45")
 (defun hx--parse-position-range (char-range)
-  (->> char-range
-    (s-replace "characters " "")
-    (s-trim)
-    (s-split "-")
-    (-map 'string-to-number)))
+  (if (s-contains-p "lines " char-range)
+      (string-to-number
+       (substring char-range
+                  (string-match (rx (+ num)) char-range)
+                  (match-end 0)))
+    (->> char-range
+      (s-replace "characters " "")
+      (s-trim)
+      (s-split "-")
+      (-map 'string-to-number))))
 
 
+;; (apply #'hx--get-symbol-from-buffer-pos '("/home/cji/priv/awesomescripts/haxeshigh/shadow/src/taglist/Taglist.hx" 145  "characters 15-19"))
 (defun hx--get-symbol-from-buffer-pos (fname line range)
-  (with-current-buffer (get-buffer (f-filename (s-trim fname)))
+  (with-current-buffer (or (ignore-errors (get-buffer (f-filename (s-trim fname)))) (current-buffer))
     (save-excursion
       (goto-char (point-min))
-      (let ((beg (line-beginning-position line)))
-        (buffer-substring-no-properties
-         (+ beg (cl-first range) -1)
-         (+ beg (cl-second range) -1))))))
+      (if (eq line range)
+          (buffer-substring-no-properties (line-beginning-position line)
+                                          (line-end-position line))
+        (let ((beg (line-beginning-position line)))
+          (buffer-substring-no-properties
+           (+ beg (cl-first range) -1)
+           (+ beg (cl-second range) -1)))))))
 
 
 
