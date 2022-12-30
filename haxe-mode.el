@@ -9,33 +9,7 @@
 (require 'compile)
 (require 'groovy-mode)
 
-
-;;; Usage:
-;;
-;; guide http://cc-mode.sourceforge.net/derived-mode-ex.el
-;;
-;; Include something like this in your .emacs:
-;; (require 'haxe-mode)
-;; (defconst my-haxe-style
-;;   '("java" (c-offsets-alist . ((case-label . +)
-;;                                (arglist-intro . +)
-;;                                (arglist-cont-nonempty . 0)
-;;                                (arglist-close . 0)
-;;                                (cpp-macro . 0))))
-;;   "My Haxe Programming Style")
-;; (add-hook 'haxe-mode-hook
-;;   (function (lambda () (c-add-style "haxe" my-haxe-style t))))
-;; (add-hook 'haxe-mode-hook
-;;           (function
-;;            (lambda ()
-;;              (setq tab-width 4)
-;;              (setq indent-tabs-mode t)
-;;              (setq fill-column 80)
-;;              (local-set-key [(return)] 'newline-and-indent))))
-
-
 ;;; Code:
-
 
 ;; The language constants are needed when compiling.
 (eval-when-compile
@@ -51,7 +25,7 @@
 
 (defface haxe-string-interpolation-face
   '((default :inherit font-lock-constant-face))
-  "Face for highlighting annotations in Groovy mode."
+  "Face for highlighting annotations in Haxe mode."
   :group 'haxe)
 
 
@@ -62,20 +36,16 @@
 ;;; Lexer-level syntax (identifiers, tokens etc).
 
 ;; No other operators in identifiers.
-(c-lang-defconst c-after-id-concat-ops
-  haxe nil)
+(c-lang-defconst c-after-id-concat-ops haxe nil)
 
 ;; Conditional compilation prefix.
-(c-lang-defconst c-opt-cpp-prefix
-  haxe "\\s *#")
+(c-lang-defconst c-opt-cpp-prefix haxe "\\s *#")
 
 ;; No strings in conditional compilation.
-(c-lang-defconst c-cpp-message-directives
-  haxe nil)
+(c-lang-defconst c-cpp-message-directives haxe nil)
 
 ;; No file name in angle brackets or quotes in conditional compilation.
-(c-lang-defconst c-cpp-include-directives
-  haxe nil)
+(c-lang-defconst c-cpp-include-directives haxe nil)
 
 
 ;; i) the syntax of \"'\" must be \"string quote\" (7);
@@ -97,15 +67,11 @@
          c-before-change-check-unbalanced-strings
          c-before-change-check-<>-operators))
 
-(c-lang-defconst c-single-quotes-quote-strings
-  haxe t)
-
-(c-lang-defconst c-single-quotes-quote-strings
-  haxe t)
+(c-lang-defconst c-single-quotes-quote-strings haxe t)
+(c-lang-defconst c-single-quotes-quote-strings haxe t)
 
 ;; No macro definition in conditional compilation.
-(c-lang-defconst c-opt-cpp-macro-define
-  haxe nil)
+(c-lang-defconst c-opt-cpp-macro-define haxe nil)
 
 ;; Conditional compilation directives followed by expressions.
 (c-lang-defconst c-cpp-expr-directives
@@ -159,17 +125,14 @@
          (left-assoc ",")))
 
 ;; No overloading.
-(c-lang-defconst c-overloadable-operators
-  haxe nil)
-(c-lang-defconst c-opt-op-identitier-prefix
-  haxe nil)
+(c-lang-defconst c-overloadable-operators haxe nil)
+(c-lang-defconst c-opt-op-identitier-prefix haxe nil)
 
 ;;; Keywords.
 
 ;; I will treat types uniformly below since they all start with capital
 ;; letters.
-(c-lang-defconst c-primitive-type-kwds
-  haxe nil)
+(c-lang-defconst c-primitive-type-kwds haxe nil)
 
 ;; TODO: check double occurrence of enum.
 ;; Type-introduction is straight forward in Haxe.
@@ -190,13 +153,13 @@
 
 ;; Definition modifiers.
 (c-lang-defconst c-modifier-kwds
-  haxe '( "private" "public" "static" "override" "macro" "inline" "untyped"))
+  haxe '( "private" "public" "static" "override" "macro" "inline" "untyped" "cast"))
 (c-lang-defconst c-other-decl-kwds
   haxe nil)
 
 ;; Namespaces.
 (c-lang-defconst c-ref-list-kwds
- haxe '( "import" "package" "using"))
+ haxe '( "import" "package" "using" "from" "to" "as"))
 
 ;; Statement keywords followed directly by a substatement.
 (c-lang-defconst c-block-stmt-1-kwds
@@ -224,7 +187,7 @@
   haxe '( "this" "super" ))
 
 (c-lang-defconst c-decl-hangon-kwds
-  haxe '( "in" ))
+  haxe '( "in" "as"))
 
 ;; No other labels.
 (c-lang-defconst c-before-label-kwds
@@ -241,8 +204,11 @@
 ;; All identifiers starting with a capital letter are types.
 (c-lang-defconst c-cpp-matchers
   haxe (append
-        (c-lang-const c-cpp-matchers c)
-        `(("\\<\\([A-Z][A-Za-z0-9_]*\\)\\>" 1 font-lock-type-face)
+        `((,(rx (group (or "using " "import ")) (group (? (+ (and (+ alpha) "."))) (group (1+ alpha))) (? (group " as ") (group (1+ alpha))) ";")
+           (1 font-lock-keyword-face)
+           (2 font-lock-type-face)
+           )
+          ("\\<\\([A-Z][A-Za-z0-9_]*\\)\\>" 1 font-lock-type-face)
           ("\\(@:[[:alnum:]]+\\)" 1 font-lock-keyword-face)
 
           ;; Stolen from groovy-mode, created by Russel Winder, Jim Morris, and
@@ -301,7 +267,8 @@
                   (set-match-data (list start res))
                   res)))
            (0 'haxe-string-interpolation-face t))
-          )))
+          )
+        (c-lang-const c-cpp-matchers c)))
 ;; (rx (group "@:" (+ alnum)) )
 ;; Generic types.
 (c-lang-defconst c-recognize-<>-arglists
@@ -325,7 +292,7 @@
 (or haxe-mode-syntax-table
     (setq haxe-mode-syntax-table
           (funcall (c-lang-const c-make-mode-syntax-table haxe))))
-(modify-syntax-entry ?' "\"" haxe-mode-syntax-table)
+
 
 (defvar haxe-mode-abbrev-table nil
   "Abbreviation table used in haxe mode buffers.")
@@ -357,7 +324,7 @@
 (defcustom haxe-mode-hook nil
   "*Hook called by `haxe-mode'."
   :type 'hook
-  :group 'c)
+  :group 'haxe)
 
 (require 'hx-compiler)
 (require 'hx-filesystem)
@@ -376,6 +343,8 @@ Key bindings:
   (interactive)
   (kill-all-local-variables)
   (c-initialize-cc-mode t)
+
+  (use-local-map haxe-mode-map)
   (set-syntax-table haxe-mode-syntax-table)
 
   (setq major-mode 'haxe-mode
@@ -383,41 +352,138 @@ Key bindings:
         local-abbrev-table haxe-mode-abbrev-table
         abbrev-mode t)
 
-  (use-local-map haxe-mode-map)
-  (define-key haxe-mode-map (kbd "<backtab>") 'my-dedent)
-  (define-key haxe-mode-map (kbd "<tab>") 'indent-for-tab-command)
-  ;; `c-init-language-vars' is a macro that is expanded at compile
-  ;; time to a large `setq' with all the language variables and their
-  ;; customized values for our language.
   (c-init-language-vars haxe-mode)
-  ;; `c-common-init' initializes most of the components of a CC Mode
-  ;; buffer, including setup of the mode menu, font-lock, etc.
-  ;; There's also a lower level routine `c-basic-common-init' that
-  ;; only makes the necessary initialization to get the syntactic
-  ;; analysis and similar things working.
-  (c-common-init 'haxe-mode)
-  (run-hooks 'c-mode-common-hook 'haxe-mode-hook)
+  (c-common-init 'haxe-mode) ; See also: `c-basic-common-init'
   (c-update-modeline)
-  (electric-pair-local-mode)
-  (setq c-syntactic-indentation nil)
-  (setq c-basic-offset 2)
-  (auto-complete-mode 1)
+  ;; (c-add-style "haxe" '((c-offsets-alist . ((case-label . 4)))) t)
+  ;; (c-add-style "haxe" my-haxe-style t)
 
   ;; doesn't work sometimes?
+  (setq-local js-switch-indent-offset 4)
   (setq-local indent-line-function #'js-indent-line)
   (setq-local indent-region-function nil)
-
   (setq-local beginning-of-defun-function #'js-beginning-of-defun)
   (setq-local end-of-defun-function #'js-end-of-defun)
+  (setq-local c-syntactic-indentation t)
+  (setq-local c-basic-offset 4)
+  (setq-local js-indent-level 4)
 
+  (run-hooks 'c-mode-common-hook 'haxe-mode-hook)
+  (hack-local-variables)
   (add-hook 'after-save-hook #'hx-shadow-update-files nil t)
   (add-hook 'xref-backend-functions #'hx-xref-backend-function nil t)
   (add-hook 'eldoc-documentation-functions #'hx-eldoc-function nil t)
-  (eldoc-mode 1)
-  (message "haxe-mode initialized"))
+  (hs-minor-mode 1)
 
+  (add-to-list 'sp-sexp-suffix '(haxe-mode regexp ""))
+  )
+
+(defun js--proper-indentation (parse-status)
+  "Return the proper indentation for the current line."
+  (save-excursion
+    (back-to-indentation)
+    (cond ((nth 4 parse-status)    ; inside comment
+           (js--get-c-offset 'c (nth 8 parse-status)))
+          ((nth 3 parse-status) 0) ; inside string
+          ((when (and js-jsx-syntax (not js-jsx--indent-col))
+             (save-excursion (js-jsx--indentation parse-status))))
+          ((and (eq (char-after) ?#)
+                (save-excursion
+                  (forward-char 1)
+                  (looking-at-p cpp-font-lock-keywords-source-directives)))
+           0)
+          ((save-excursion (js--beginning-of-macro)) 4)
+          ;; Indent array comprehension continuation lines specially.
+          ((let ((bracket (nth 1 parse-status))
+                 beg)
+             (and bracket
+                  (not (js--same-line bracket))
+                  (setq beg (js--indent-in-array-comp bracket))
+                  ;; At or after the first loop?
+                  (>= (point) beg)
+                  (js--array-comp-indentation bracket beg))))
+          ((js--chained-expression-p))
+          ((js--ctrl-statement-indentation))
+          ((js--multi-line-declaration-indentation))
+          ((nth 1 parse-status)
+	   ;; A single closing paren/bracket should be indented at the
+	   ;; same level as the opening statement. Same goes for
+	   ;; "case" and "default".
+           (let ((same-indent-p (looking-at "[]})]"))
+                 (switch-keyword-p (looking-at "default\\_>\\|case\\_>[^:]"))
+                 (continued-expr-p (js--continued-expression-p)))
+             (goto-char (nth 1 parse-status)) ; go to the opening char
+             (if (or (not js-indent-align-list-continuation)
+                     (looking-at "[({[]\\s-*\\(/[/*]\\|$\\)")
+                     (save-excursion (forward-char) (js--broken-arrow-terminates-line-p)))
+                 (progn ; nothing following the opening paren/bracket
+                   (skip-syntax-backward " ")
+                   (when (eq (char-before) ?\)) (backward-list))
+                   (back-to-indentation)
+                   (js--maybe-goto-declaration-keyword-end parse-status)
+                   (let* ((in-switch-p (unless same-indent-p
+                                         (looking-at ".*\\_<switch\\_>")))
+                          (same-indent-p (or same-indent-p
+                                             (and switch-keyword-p
+                                                  in-switch-p)))
+                          (indent
+                           (+
+                            (cond
+                             ((and js-jsx--indent-attribute-line
+                                   (eq js-jsx--indent-attribute-line
+                                       (line-number-at-pos)))
+                              js-jsx--indent-col)
+                             (t
+                              (current-column)))
+                            (cond (same-indent-p 0)
+                                  (continued-expr-p
+                                   (+ (* 2 js-indent-level)
+                                      js-expr-indent-offset))
+                                  (t
+                                   (+ js-indent-level
+                                      (pcase (char-after (nth 1 parse-status))
+                                        (?\( js-paren-indent-offset)
+                                        (?\[ js-square-indent-offset)
+                                        (?\{ js-curly-indent-offset))))))))
+                     (if in-switch-p
+                         (+ indent js-switch-indent-offset)
+                       indent)))
+               ;; If there is something following the opening
+               ;; paren/bracket, everything else should be indented at
+               ;; the same level.
+               (unless same-indent-p
+                 (forward-char)
+                 (skip-chars-forward " \t"))
+               (current-column))))
+
+          ((js--continued-expression-p)
+           (+ js-indent-level js-expr-indent-offset))
+          (t (prog-first-column)))))
+
+;; (modify-syntax-entry ?' "\"" haxe-mode-syntax-table)
+
+;; (add-to-list 'sp-sexp-suffix '(haxe-mode regexp ";"))
+;; (setq sp-sexp-suffix nil)
+
+;; (modify-syntax-entry ?. "w" haxe-mode-syntax-table)
+;; (modify-syntax-entry ?. "." haxe-mode-syntax-table)
 
 ;; switch between file(s) and the compiled output (a'la "go to implementation")
+
+;; (defconst my-haxe-style
+;;   '("java" (c-offsets-alist . ( (case-label . +))))
+;;   "My Haxe Programming Style")
+
+;; (add-hook 'haxe-mode-hook
+;;   (function (lambda () (c-add-style "haxe" my-haxe-style t))))
+;; (add-hook 'haxe-mode-hook
+;;           (function
+;;            (lambda ()
+;;              (setq tab-width 4)
+;;              (setq indent-tabs-mode t)
+;;              (setq fill-column 80)
+;;              (local-set-key [(return)] 'newline-and-indent))))
+
 
 
 (provide 'haxe-mode)
